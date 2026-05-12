@@ -132,6 +132,27 @@ const mergedTags = computed(() => {
   return [...customTags.value, ...priceTags.value]
 })
 
+const renderMemoKey = computed(() => JSON.stringify({
+  cardProgressLayout: appStore.cardProgressLayout,
+  numberFontFamily: appStore.numberFontFamily,
+  tagsInSeparateRow: appStore.tagsInSeparateRow,
+  uptimeTagWrap: appStore.uptimeTagWrap,
+  uptimeFormat: appStore.uptimeFormat,
+  showPingChartButton: appStore.showPingChartButton,
+  trafficSplitColor: appStore.trafficSplitColor,
+  byteDecimals: appStore.byteDecimals,
+  lightCardContrast: appStore.lightCardContrast,
+  isDark: appStore.isDark,
+  backgroundEnabled: appStore.backgroundEnabled,
+  cardBlurRadius: appStore.cardBlurRadius,
+  lang: appStore.lang,
+  successColor: themeVars.value.successColor,
+  errorColor: themeVars.value.errorColor,
+  infoColor: themeVars.value.infoColor,
+  textColorBase: themeVars.value.textColorBase,
+  textColor3: themeVars.value.textColor3,
+}))
+
 // 是否在单独一行显示标签
 const shouldShowTagsInSeparateRow = computed(() => {
   return appStore.tagsInSeparateRow && mergedTags.value.length > 0
@@ -162,6 +183,7 @@ const cardBlurClass = computed(() => {
 <template>
   <div>
     <NCard
+      v-memo="[props.node, renderMemoKey]"
       hoverable
       class="node-card w-full cursor-pointer transition-all duration-200" :class="[
         props.node.online ? 'hover:border-primary' : 'node-card--offline',

@@ -87,6 +87,62 @@ interface StatusData {
   uptime: number
 }
 
+const STATUS_FIELDS = [
+  'online',
+  'time',
+  'cpu',
+  'gpu',
+  'ram',
+  'swap',
+  'load',
+  'load5',
+  'load15',
+  'temp',
+  'disk',
+  'net_in',
+  'net_out',
+  'net_total_up',
+  'net_total_down',
+  'process',
+  'connections',
+  'connections_udp',
+  'uptime',
+] as const satisfies readonly (keyof StatusData)[]
+
+const CLIENT_FIELDS = [
+  'uuid',
+  'name',
+  'cpu_name',
+  'virtualization',
+  'arch',
+  'cpu_cores',
+  'os',
+  'kernel_version',
+  'gpu_name',
+  'ipv4',
+  'ipv6',
+  'region',
+  'remark',
+  'public_remark',
+  'mem_total',
+  'swap_total',
+  'disk_total',
+  'version',
+  'weight',
+  'price',
+  'billing_cycle',
+  'auto_renewal',
+  'currency',
+  'expired_at',
+  'group',
+  'tags',
+  'hidden',
+  'traffic_limit',
+  'traffic_limit_type',
+  'created_at',
+  'updated_at',
+] as const satisfies readonly (keyof Client)[]
+
 const useNodesStore = defineStore('nodes', () => {
   // ===== 状态 =====
   const nodes = ref<NodeData[]>([])
@@ -220,6 +276,22 @@ const useNodesStore = defineStore('nodes', () => {
   }
 
   /**
+   * 高频状态轮询下，未变化的节点保持原引用，减少列表和卡片的无效 patch。
+   */
+  function isStatusChanged(node: NodeData, status: StatusData): boolean {
+    return STATUS_FIELDS.some(field => node[field] !== status[field])
+  }
+
+  function isClientChanged(node: NodeData, client: Client): boolean {
+    return CLIENT_FIELDS.some((field) => {
+      if (field === 'traffic_limit_type') {
+        return node.traffic_limit_type !== client.traffic_limit_type
+      }
+      return node[field as keyof NodeData] !== client[field]
+    })
+  }
+
+  /**
    * 从 NodeStatus 提取状态数据
    */
   function extractStatusData(status: NodeStatus): StatusData {
@@ -314,7 +386,10 @@ const useNodesStore = defineStore('nodes', () => {
       if (!node)
         return
 
-      nodes.value[index] = updateNodeStatus(node, extractStatusData(status))
+      const statusData = extractStatusData(status)
+      if (isStatusChanged(node, statusData)) {
+        nodes.value[index] = updateNodeStatus(node, statusData)
+      }
     })
   }
 
@@ -334,6 +409,10 @@ const useNodesStore = defineStore('nodes', () => {
         const currentNode = nodes.value[index]
         if (!currentNode)
           return
+
+        if (!isClientChanged(currentNode, client)) {
+          return
+        }
 
         const baseNode = createNodeFromClient(client)
         nodes.value[index] = updateNodeStatus(baseNode, {

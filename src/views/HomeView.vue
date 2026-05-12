@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useDebounceFn } from '@vueuse/core'
+import { useDebounceFn, useEventListener } from '@vueuse/core'
 import { NAlert, NDivider, NEmpty, NInput, NRadioButton, NRadioGroup, NTabPane, NTabs } from 'naive-ui'
 import { computed, defineAsyncComponent, nextTick, onActivated, onDeactivated, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
@@ -22,6 +22,10 @@ const appStore = useAppStore()
 const nodesStore = useNodesStore()
 
 const router = useRouter()
+
+const INITIAL_RENDER_COUNT = 80
+const RENDER_BATCH_SIZE = 80
+const LOAD_MORE_DISTANCE = 900
 
 // 组件激活时恢复滚动位置
 onActivated(() => {
@@ -136,6 +140,48 @@ const nodeList = computed(() => {
   return filteredNodes
 })
 
+const renderLimit = ref(INITIAL_RENDER_COUNT)
+const renderedNodeList = computed(() => nodeList.value.slice(0, renderLimit.value))
+const hasMoreNodes = computed(() => renderLimit.value < nodeList.value.length)
+
+function loadMoreNodes() {
+  if (!hasMoreNodes.value)
+    return
+  renderLimit.value = Math.min(nodeList.value.length, renderLimit.value + RENDER_BATCH_SIZE)
+}
+
+function ensureRenderWindowFilled() {
+  if (typeof window === 'undefined')
+    return
+
+  while (
+    hasMoreNodes.value
+    && document.documentElement.scrollHeight <= window.innerHeight + LOAD_MORE_DISTANCE
+  ) {
+    loadMoreNodes()
+  }
+}
+
+function handleProgressiveRender() {
+  if (!hasMoreNodes.value || typeof window === 'undefined')
+    return
+
+  const distanceToBottom = document.documentElement.scrollHeight - (window.scrollY + window.innerHeight)
+  if (distanceToBottom <= LOAD_MORE_DISTANCE) {
+    loadMoreNodes()
+  }
+}
+
+watch(
+  [() => appStore.nodeSelectedGroup, debouncedSearchText, () => appStore.nodeViewMode],
+  () => {
+    renderLimit.value = INITIAL_RENDER_COUNT
+    nextTick(ensureRenderWindowFilled)
+  },
+)
+
+useEventListener(window, 'scroll', handleProgressiveRender, { passive: true })
+
 function handleNodeClick(node: typeof nodesStore.nodes[number]) {
   router.push({ name: 'instance-detail', params: { id: node.uuid } })
 }
@@ -204,7 +250,7 @@ const blurClass = computed(() => {
           <NTabPane v-for="group in groups" :key="group.name" :tab="group.tab" :name="group.name">
             <!-- Card 视图 -->
             <div v-if="nodeList.length !== 0 && appStore.nodeViewMode === 'card'" class="gap-4 grid grid-cols-1 sm:grid-cols-[repeat(auto-fill,minmax(340px,1fr))]">
-              <NodeCard v-for="node in nodeList" :key="node.uuid" :node="node" @click="handleNodeClick(node)" />
+              <NodeCard v-for="node in renderedNodeList" :key="node.uuid" :node="node" @click="handleNodeClick(node)" />
             </div>
             <!-- List 视图 -->
             <NodeList v-else-if="nodeList.length !== 0 && appStore.nodeViewMode === 'list'" :nodes="nodeList" @click="handleNodeClick" />
@@ -218,7 +264,7 @@ const blurClass = computed(() => {
         <template v-else>
           <!-- Card 视图 -->
           <div v-if="nodeList.length !== 0 && appStore.nodeViewMode === 'card'" class="gap-4 grid grid-cols-1 sm:grid-cols-[repeat(auto-fill,minmax(340px,1fr))]">
-            <NodeCard v-for="node in nodeList" :key="node.uuid" :node="node" @click="handleNodeClick(node)" />
+            <NodeCard v-for="node in renderedNodeList" :key="node.uuid" :node="node" @click="handleNodeClick(node)" />
           </div>
           <!-- List 视图 -->
           <NodeList v-else-if="nodeList.length !== 0 && appStore.nodeViewMode === 'list'" :nodes="nodeList" @click="handleNodeClick" />

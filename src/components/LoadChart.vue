@@ -149,6 +149,9 @@ const remoteData = shallowRef<StatusRecord[]>([])
 const loading = ref(false)
 const isInitialLoad = ref(true) // 是否为首次加载（用于控制实时模式下的 NSpin 显示）
 const error = ref<string | null>(null)
+let fetchSequence = 0
+let realtimeFetchInFlight = false
+let historyFetchInFlight = false
 
 // 节点信息
 const nodeInfo = computed(() => nodesStore.nodesByUuid.get(props.uuid))
@@ -187,6 +190,11 @@ function statusToRecordFormat(records: StatusRecord[]): RecordFormat[] {
 async function fetchRecentData() {
   if (!props.uuid)
     return
+  if (realtimeFetchInFlight)
+    return
+
+  realtimeFetchInFlight = true
+  const sequence = ++fetchSequence
 
   // 只在首次加载时显示 loading
   if (isInitialLoad.value) {
@@ -199,21 +207,33 @@ async function fetchRecentData() {
     const records = result?.records || []
     records.sort((a, b) => dayjs(a.time).valueOf() - dayjs(b.time).valueOf())
     const maxLength = 150
+    if (sequence !== fetchSequence)
+      return
     remoteData.value = records.slice(-maxLength)
   }
   catch (err) {
+    if (sequence !== fetchSequence)
+      return
     error.value = err instanceof Error ? err.message : '获取数据失败'
     remoteData.value = []
   }
   finally {
-    loading.value = false
-    isInitialLoad.value = false
+    if (sequence === fetchSequence) {
+      loading.value = false
+      isInitialLoad.value = false
+      realtimeFetchInFlight = false
+    }
   }
 }
 
 async function fetchHistoryData() {
   if (!props.uuid)
     return
+  if (historyFetchInFlight)
+    return
+
+  historyFetchInFlight = true
+  const sequence = ++fetchSequence
 
   const hours = selectedHours.value || 4
 
@@ -236,14 +256,21 @@ async function fetchHistoryData() {
       dayjs(a.time).valueOf() - dayjs(b.time).valueOf(),
     )
 
+    if (sequence !== fetchSequence)
+      return
     remoteData.value = records
   }
   catch (err) {
+    if (sequence !== fetchSequence)
+      return
     error.value = err instanceof Error ? err.message : '获取数据失败'
     remoteData.value = []
   }
   finally {
-    loading.value = false
+    if (sequence === fetchSequence) {
+      loading.value = false
+      historyFetchInFlight = false
+    }
   }
 }
 
@@ -295,6 +322,30 @@ const latestStatus = computed(() => {
     return null
   return data[data.length - 1]
 })
+
+const latestRam = computed(() => latestStatus.value?.ram != null
+  ? formatBytesSplit(latestStatus.value.ram, appStore.byteDecimals)
+  : null)
+
+const totalRam = computed(() => nodeInfo.value?.mem_total
+  ? formatBytesSplit(nodeInfo.value.mem_total, appStore.byteDecimals)
+  : null)
+
+const latestDisk = computed(() => latestStatus.value?.disk != null
+  ? formatBytesSplit(latestStatus.value.disk, appStore.byteDecimals)
+  : null)
+
+const totalDisk = computed(() => nodeInfo.value?.disk_total
+  ? formatBytesSplit(nodeInfo.value.disk_total, appStore.byteDecimals)
+  : null)
+
+const latestNetOut = computed(() => latestStatus.value?.net_out != null
+  ? formatBytesSplit(latestStatus.value.net_out, appStore.byteDecimals)
+  : null)
+
+const latestNetIn = computed(() => latestStatus.value?.net_in != null
+  ? formatBytesSplit(latestStatus.value.net_in, appStore.byteDecimals)
+  : null)
 
 // ==================== 工具函数 ====================
 
@@ -840,11 +891,17 @@ const blurClass = computed(() => {
 // ==================== 生命周期 ====================
 
 watch(selectedView, () => {
+  fetchSequence += 1
+  realtimeFetchInFlight = false
+  historyFetchInFlight = false
   isInitialLoad.value = true // 切换视图时重置首次加载状态
   fetchData()
 })
 
 watch(() => props.uuid, () => {
+  fetchSequence += 1
+  realtimeFetchInFlight = false
+  historyFetchInFlight = false
   remoteData.value = []
   isInitialLoad.value = true // 切换节点时重置首次加载状态
   fetchData()
@@ -904,15 +961,15 @@ onMounted(() => {
             <div class="flex items-center justify-between">
               <span class="text-base font-bold">内存</span>
               <div class="text-sm flex gap-1 items-baseline">
-                <template v-if="latestStatus?.ram != null">
-                  <span :style="{ fontFamily: appStore.numberFontFamily, color: 'var(--n-text-color-1)' }">{{ formatBytesSplit(latestStatus.ram, appStore.byteDecimals).value }}</span>
-                  <span style="color: var(--n-text-color-3)">{{ formatBytesSplit(latestStatus.ram, appStore.byteDecimals).unit }}</span>
+                <template v-if="latestRam">
+                  <span :style="{ fontFamily: appStore.numberFontFamily, color: 'var(--n-text-color-1)' }">{{ latestRam.value }}</span>
+                  <span style="color: var(--n-text-color-3)">{{ latestRam.unit }}</span>
                 </template>
                 <span v-else style="color: var(--n-text-color-3)">-</span>
                 <span style="color: var(--n-text-color-3)">/</span>
-                <template v-if="nodeInfo?.mem_total">
-                  <span :style="{ fontFamily: appStore.numberFontFamily, color: 'var(--n-text-color-3)' }">{{ formatBytesSplit(nodeInfo.mem_total, appStore.byteDecimals).value }}</span>
-                  <span style="color: var(--n-text-color-3)">{{ formatBytesSplit(nodeInfo.mem_total, appStore.byteDecimals).unit }}</span>
+                <template v-if="totalRam">
+                  <span :style="{ fontFamily: appStore.numberFontFamily, color: 'var(--n-text-color-3)' }">{{ totalRam.value }}</span>
+                  <span style="color: var(--n-text-color-3)">{{ totalRam.unit }}</span>
                 </template>
                 <span v-else style="color: var(--n-text-color-3)">-</span>
               </div>
@@ -929,15 +986,15 @@ onMounted(() => {
             <div class="flex items-center justify-between">
               <span class="text-base font-bold">磁盘</span>
               <div class="text-sm flex gap-1 items-baseline">
-                <template v-if="latestStatus?.disk != null">
-                  <span :style="{ fontFamily: appStore.numberFontFamily, color: 'var(--n-text-color-1)' }">{{ formatBytesSplit(latestStatus.disk, appStore.byteDecimals).value }}</span>
-                  <span style="color: var(--n-text-color-3)">{{ formatBytesSplit(latestStatus.disk, appStore.byteDecimals).unit }}</span>
+                <template v-if="latestDisk">
+                  <span :style="{ fontFamily: appStore.numberFontFamily, color: 'var(--n-text-color-1)' }">{{ latestDisk.value }}</span>
+                  <span style="color: var(--n-text-color-3)">{{ latestDisk.unit }}</span>
                 </template>
                 <span v-else style="color: var(--n-text-color-3)">-</span>
                 <span style="color: var(--n-text-color-3)">/</span>
-                <template v-if="nodeInfo?.disk_total">
-                  <span :style="{ fontFamily: appStore.numberFontFamily, color: 'var(--n-text-color-3)' }">{{ formatBytesSplit(nodeInfo.disk_total, appStore.byteDecimals).value }}</span>
-                  <span style="color: var(--n-text-color-3)">{{ formatBytesSplit(nodeInfo.disk_total, appStore.byteDecimals).unit }}</span>
+                <template v-if="totalDisk">
+                  <span :style="{ fontFamily: appStore.numberFontFamily, color: 'var(--n-text-color-3)' }">{{ totalDisk.value }}</span>
+                  <span style="color: var(--n-text-color-3)">{{ totalDisk.unit }}</span>
                 </template>
                 <span v-else style="color: var(--n-text-color-3)">-</span>
               </div>
@@ -955,16 +1012,16 @@ onMounted(() => {
               <span class="text-base font-bold">网络</span>
               <div class="text-sm flex gap-1 items-baseline">
                 <span style="color: var(--n-text-color-3)">↑</span>
-                <template v-if="latestStatus?.net_out != null">
-                  <span :style="{ fontFamily: appStore.numberFontFamily, color: 'var(--n-text-color-1)' }">{{ formatBytesSplit(latestStatus.net_out, appStore.byteDecimals).value }}</span>
-                  <span style="color: var(--n-text-color-3)">{{ formatBytesSplit(latestStatus.net_out, appStore.byteDecimals).unit }}/s</span>
+                <template v-if="latestNetOut">
+                  <span :style="{ fontFamily: appStore.numberFontFamily, color: 'var(--n-text-color-1)' }">{{ latestNetOut.value }}</span>
+                  <span style="color: var(--n-text-color-3)">{{ latestNetOut.unit }}/s</span>
                 </template>
                 <span v-else style="color: var(--n-text-color-3)">-</span>
                 <span style="color: var(--n-text-color-3)">｜</span>
                 <span style="color: var(--n-text-color-3)">↓</span>
-                <template v-if="latestStatus?.net_in != null">
-                  <span :style="{ fontFamily: appStore.numberFontFamily, color: 'var(--n-text-color-1)' }">{{ formatBytesSplit(latestStatus.net_in, appStore.byteDecimals).value }}</span>
-                  <span style="color: var(--n-text-color-3)">{{ formatBytesSplit(latestStatus.net_in, appStore.byteDecimals).unit }}/s</span>
+                <template v-if="latestNetIn">
+                  <span :style="{ fontFamily: appStore.numberFontFamily, color: 'var(--n-text-color-1)' }">{{ latestNetIn.value }}</span>
+                  <span style="color: var(--n-text-color-3)">{{ latestNetIn.unit }}/s</span>
                 </template>
                 <span v-else style="color: var(--n-text-color-3)">-</span>
               </div>

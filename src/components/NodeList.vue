@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import type { NodeData } from '@/stores/nodes'
+import { useEventListener } from '@vueuse/core'
 import { NBadge, NButton, NIcon, NList, NListItem, NModal, NProgress, NTag, NText, NTooltip, useThemeVars } from 'naive-ui'
-import { computed, defineAsyncComponent, ref } from 'vue'
+import { computed, defineAsyncComponent, nextTick, ref, watch } from 'vue'
 import TrafficProgress from '@/components/TrafficProgress.vue'
 import { useAppStore } from '@/stores/app'
 import { formatBytesPerSecondWithConfig, formatBytesWithConfig, formatDateTime, formatUptimeWithFormat, getStatus } from '@/utils/helper'
@@ -34,6 +35,10 @@ const themeVars = useThemeVars()
 // 延迟图表弹窗状态
 const showPingChart = ref(false)
 const selectedNode = ref<NodeData | null>(null)
+
+const INITIAL_RENDER_COUNT = 80
+const RENDER_BATCH_SIZE = 80
+const LOAD_MORE_DISTANCE = 900
 
 // 排序状态
 const sortKey = ref<string>('')
@@ -94,8 +99,64 @@ const sortedNodes = computed(() => {
   })
 })
 
+const renderLimit = ref(INITIAL_RENDER_COUNT)
+const renderedNodes = computed(() => sortedNodes.value.slice(0, renderLimit.value))
+const hasMoreNodes = computed(() => renderLimit.value < sortedNodes.value.length)
+
+function loadMoreNodes() {
+  if (!hasMoreNodes.value)
+    return
+  renderLimit.value = Math.min(sortedNodes.value.length, renderLimit.value + RENDER_BATCH_SIZE)
+}
+
+function ensureRenderWindowFilled() {
+  if (typeof window === 'undefined')
+    return
+
+  while (
+    hasMoreNodes.value
+    && document.documentElement.scrollHeight <= window.innerHeight + LOAD_MORE_DISTANCE
+  ) {
+    loadMoreNodes()
+  }
+}
+
+function handleProgressiveRender() {
+  if (!hasMoreNodes.value || typeof window === 'undefined')
+    return
+
+  const distanceToBottom = document.documentElement.scrollHeight - (window.scrollY + window.innerHeight)
+  if (distanceToBottom <= LOAD_MORE_DISTANCE) {
+    loadMoreNodes()
+  }
+}
+
+watch([() => props.nodes, sortKey, sortDir], () => {
+  renderLimit.value = INITIAL_RENDER_COUNT
+  nextTick(ensureRenderWindowFilled)
+})
+
+useEventListener(window, 'scroll', handleProgressiveRender, { passive: true })
+
 // 列可见性计算
 const columns = computed(() => appStore.listViewColumns)
+
+const listRenderMemoKey = computed(() => JSON.stringify({
+  columns: columns.value,
+  columnWidths: appStore.listColumnWidths,
+  columnGap: appStore.listColumnGap,
+  columnPadding: appStore.listColumnPadding,
+  columnMargin: appStore.listColumnMargin,
+  rowHeight: appStore.listRowHeight,
+  statusStyle: appStore.listStatusStyle,
+  tagsStyle: appStore.listTagsStyle,
+  showPingChartButton: appStore.showPingChartButton,
+  uptimeFormat: appStore.uptimeFormat,
+  byteDecimals: appStore.byteDecimals,
+  numberFontFamily: appStore.numberFontFamily,
+  successColor: themeVars.value.successColor,
+  infoColor: themeVars.value.infoColor,
+}))
 
 // 格式化函数
 const formatBytes = (bytes: number) => formatBytesWithConfig(bytes, appStore.byteDecimals)
@@ -293,7 +354,20 @@ function getExpireBadgeColor(status: string): string {
 }
 
 // 计算节点的标签列表（返回颜色）
-function getNodeTags(node: NodeData): Array<{ text: string, color: string }> {
+interface NodeTag {
+  text: string
+  color: string
+}
+
+const nodeTagsCache = new WeakMap<NodeData, { key: string, tags: NodeTag[] }>()
+const nodeTagsCacheKey = computed(() => `${appStore.lang}|${themeVars.value.infoColor}`)
+
+function getNodeTags(node: NodeData): NodeTag[] {
+  const cached = nodeTagsCache.get(node)
+  if (cached?.key === nodeTagsCacheKey.value) {
+    return cached.tags
+  }
+
   const tags: Array<{ text: string, color: string }> = []
   const lang = appStore.lang
 
@@ -325,6 +399,7 @@ function getNodeTags(node: NodeData): Array<{ text: string, color: string }> {
     tags.push({ text: tag.text, color: tag.hex })
   }
 
+  nodeTagsCache.set(node, { key: nodeTagsCacheKey.value, tags })
   return tags
 }
 
@@ -373,8 +448,9 @@ const columnTitles: Record<string, string> = {
         </div>
       </template>
       <NListItem
-        v-for="node in sortedNodes"
+        v-for="node in renderedNodes"
         :key="node.uuid"
+        v-memo="[node, listRenderMemoKey]"
         class="node-list-row"
         :class="{ 'node-list-row--offline': !node.online }"
         :style="rowHeightStyle"

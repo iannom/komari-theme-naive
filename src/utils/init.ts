@@ -30,6 +30,9 @@ const DEFAULT_CONFIG: Required<InitConfig> = {
   postFailureThreshold: 3,
 }
 
+/** 节点基本信息变化频率低，降低高频轮询里的全量节点元信息请求。 */
+const CLIENT_REFRESH_POLL_MULTIPLIER = 10
+
 /** 初始化状态管理 */
 class InitManager {
   private config: Required<InitConfig>
@@ -41,6 +44,7 @@ class InitManager {
   private isInitialized = false
   private useWebSocket: boolean | null = null // 根据主题配置决定
   private postFailureCount = 0
+  private pollCount = 0
 
   constructor(config: InitConfig = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config }
@@ -385,18 +389,29 @@ class InitManager {
     this.isPolling = true
 
     try {
-      // 并行执行三个请求
-      const [, clientsResult, statusesResult] = await Promise.all([
+      this.pollCount += 1
+      const shouldRefreshClients = this.pollCount === 1 || this.pollCount % CLIENT_REFRESH_POLL_MULTIPLIER === 0
+
+      // 节点状态高频刷新，节点元信息低频刷新，避免每轮重复拉取低频数据。
+      const [pingResult, statusesResult, clientsResult] = await Promise.all([
         // 1. Ping 测试服务器状态
         this.rpc.ping(),
-        // 2. 获取节点信息
-        this.rpc.getNodes() as Promise<Record<string, Client>>,
-        // 3. 获取节点最新状态
+        // 2. 获取节点最新状态
         this.rpc.getNodesLatestStatus() as Promise<Record<string, NodeStatus>>,
+        // 3. 低频获取节点信息
+        shouldRefreshClients
+          ? this.rpc.getNodes() as Promise<Record<string, Client>>
+          : Promise.resolve(null),
       ])
 
-      // 更新节点信息（会智能合并，不会重建数组）
-      this.nodesStore.updateNodeClients(clientsResult)
+      if (pingResult !== 'pong') {
+        throw new RpcError(-32000, 'Unexpected poll response')
+      }
+
+      if (clientsResult) {
+        // 更新节点信息（会智能合并，不会重建数组）
+        this.nodesStore.updateNodeClients(clientsResult)
+      }
 
       // 更新节点状态
       this.nodesStore.updateNodeStatuses(statusesResult)

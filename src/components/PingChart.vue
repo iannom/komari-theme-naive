@@ -133,6 +133,8 @@ const remoteData = shallowRef<PingRecord[]>([])
 const tasks = shallowRef<TaskInfo[]>([])
 const loading = ref(false)
 const error = ref<string | null>(null)
+let fetchSequence = 0
+let fetchInFlight = false
 
 // 任务选择
 const selectedTaskIds = ref<number[]>([])
@@ -145,7 +147,11 @@ const chartMargin = { top: 12, right: 24, bottom: 52, left: 56 }
 async function fetchRecords() {
   if (!props.uuid)
     return
+  if (fetchInFlight)
+    return
 
+  fetchInFlight = true
+  const sequence = ++fetchSequence
   loading.value = true
   error.value = null
 
@@ -159,6 +165,8 @@ async function fetchRecords() {
     const records = result?.records || []
     records.sort((a, b) => dayjs(a.time).valueOf() - dayjs(b.time).valueOf())
 
+    if (sequence !== fetchSequence)
+      return
     remoteData.value = records
     tasks.value = result?.tasks || []
 
@@ -167,12 +175,17 @@ async function fetchRecords() {
     }
   }
   catch (err) {
+    if (sequence !== fetchSequence)
+      return
     error.value = err instanceof Error ? err.message : '获取数据失败'
     remoteData.value = []
     tasks.value = []
   }
   finally {
-    loading.value = false
+    if (sequence === fetchSequence) {
+      loading.value = false
+      fetchInFlight = false
+    }
   }
 }
 
@@ -501,11 +514,15 @@ const pingChartOption = computed(() => {
 // ==================== 生命周期 ====================
 
 watch(selectedView, () => {
+  fetchSequence += 1
+  fetchInFlight = false
   selectedTaskIds.value = []
   fetchRecords()
 })
 
 watch(() => props.uuid, () => {
+  fetchSequence += 1
+  fetchInFlight = false
   remoteData.value = []
   tasks.value = []
   selectedTaskIds.value = []
