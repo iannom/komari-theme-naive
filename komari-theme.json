@@ -36,6 +36,7 @@
       { "name": "页面布局", "type": "title" },
       { "key": "fullWidth", "name": "占满屏幕宽度", "type": "switch", "default": false, "help": "启用后页面内容将占满整个屏幕宽度" },
       { "key": "maxPageWidth", "name": "最大页面宽度", "type": "string", "default": "1800px", "help": "页面内容的最大宽度（如 1800px、100rem）" },
+      { "key": "hideHomeFooter", "name": "隐藏主页底部页脚", "type": "switch", "default": false, "help": "启用后仅隐藏主页底部页脚，详情页仍会显示页脚" },
       { "key": "borderRadius", "name": "圆角大小", "type": "string", "default": "3px", "help": "全局圆角大小（如 3px、0.5rem）" },
       { "key": "fontFamily", "name": "字体", "type": "string", "default": "\"MiSans VF\", sans-serif", "help": "全局字体设置，多个字体用逗号分隔" },
       { "key": "numberFontFamily", "name": "数字字体", "type": "string", "default": "\"TCloud Number VF\", \"MiSans VF\", sans-serif", "help": "数字显示专用字体，用于数值展示（如 CPU、内存、流量等）" },

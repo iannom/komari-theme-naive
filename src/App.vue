@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import Background from './components/Background.vue'
 import Footer from './components/Footer.vue'
 import Header from './components/Header.vue'
@@ -9,6 +10,7 @@ import { useAppStore } from './stores/app'
 import { destroyInitManager, initApp } from './utils/init'
 
 const appStore = useAppStore()
+const route = useRoute()
 
 // 组件就绪状态：用于确保 DOM 完全渲染后再隐藏 loading
 const isReady = ref(false)
@@ -23,6 +25,9 @@ const pageContainerStyle = computed(() => {
     marginInline: 'auto',
   }
 })
+
+// 主页页脚可通过主题设置隐藏，其他页面保持原有显示行为
+const showFooter = computed(() => !appStore.loading && !(route.name === 'home' && appStore.hideHomeFooter))
 
 // 初始化应用
 onMounted(async () => {
@@ -79,7 +84,7 @@ onUnmounted(() => {
         </RouterView>
       </div>
     </main>
-    <Footer v-if="!appStore.loading" />
+    <Footer v-if="showFooter" />
   </Provider>
 </template>
 

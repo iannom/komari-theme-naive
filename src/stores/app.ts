@@ -125,6 +125,15 @@ const useAppStore = defineStore('app', () => {
     return '1800px'
   })
 
+  // 计算属性：是否隐藏主页底部页脚
+  const hideHomeFooter = computed<boolean>(() => {
+    const settings = publicSettings.value?.theme_settings
+    if (settings && typeof settings.hideHomeFooter === 'boolean') {
+      return settings.hideHomeFooter
+    }
+    return false
+  })
+
   // 计算属性：卡片进度条布局配置
   const cardProgressLayout = computed<'1col' | '2col'>(() => {
     const settings = publicSettings.value?.theme_settings
@@ -629,6 +638,7 @@ const useAppStore = defineStore('app', () => {
     showLoginButton,
     fullWidth,
     maxPageWidth,
+    hideHomeFooter,
     cardProgressLayout,
     numberFontFamily,
     listViewColumns,
