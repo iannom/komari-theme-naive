@@ -225,10 +225,10 @@ const lightCardContrastEnabled = computed(() => appStore.lightCardContrast && !a
       <!-- 图表标签页 -->
       <div class="p-4">
         <NTabs v-model:value="chartView" type="segment" animated>
-          <NTabPane name="load" tab="负载">
+          <NTabPane name="load" tab="负载" display-directive="show:lazy">
             <LoadChart :uuid="data.uuid" />
           </NTabPane>
-          <NTabPane name="ping" tab="延迟">
+          <NTabPane name="ping" tab="延迟" display-directive="show:lazy">
             <PingChart :uuid="data.uuid" />
           </NTabPane>
         </NTabs>

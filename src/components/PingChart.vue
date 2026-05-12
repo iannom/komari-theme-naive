@@ -196,24 +196,32 @@ const mergedData = computed(() => {
   )
 
   const grouped: Map<number, Record<string, unknown>> = new Map()
-  const anchors: number[] = []
+  const bucketAnchors = new Map<number, number>()
+
+  function findAnchor(ts: number): number | null {
+    const bucket = Math.round(ts / toleranceMs)
+    for (const candidateBucket of [bucket - 1, bucket, bucket + 1]) {
+      const anchor = bucketAnchors.get(candidateBucket)
+      if (anchor !== undefined && Math.abs(anchor - ts) <= toleranceMs) {
+        return anchor
+      }
+    }
+    return null
+  }
+
+  function addAnchor(ts: number): void {
+    bucketAnchors.set(Math.round(ts / toleranceMs), ts)
+  }
 
   for (const rec of data) {
     const ts = dayjs(rec.time).valueOf()
-    let anchor: number | null = null
-
-    for (const a of anchors) {
-      if (Math.abs(a - ts) <= toleranceMs) {
-        anchor = a
-        break
-      }
-    }
+    const anchor = findAnchor(ts)
 
     const useTs = anchor ?? ts
     if (!grouped.has(useTs)) {
       grouped.set(useTs, { time: dayjs(useTs).toISOString() })
       if (anchor === null) {
-        anchors.push(useTs)
+        addAnchor(useTs)
       }
     }
 

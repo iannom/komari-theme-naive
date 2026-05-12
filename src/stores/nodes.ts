@@ -122,6 +122,17 @@ const useNodesStore = defineStore('nodes', () => {
   // ===== 方法 =====
 
   /**
+   * 为当前节点数组建立索引，避免批量更新时反复线性查找。
+   */
+  function createNodeIndexMap(): Map<string, number> {
+    const map = new Map<string, number>()
+    nodes.value.forEach((node, index) => {
+      map.set(node.uuid, index)
+    })
+    return map
+  }
+
+  /**
    * 从 Client 对象创建节点数据
    */
   function createNodeFromClient(client: Client): NodeData {
@@ -240,7 +251,7 @@ const useNodesStore = defineStore('nodes', () => {
    */
   function initNodes(clients: Record<string, Client>, statuses: Record<string, NodeStatus>): void {
     const uuids = Object.keys(clients)
-    const existingUuids = new Set(nodes.value.map(n => n.uuid))
+    const nodeIndexMap = createNodeIndexMap()
 
     // 更新现有节点或添加新节点
     uuids.forEach((uuid) => {
@@ -249,9 +260,9 @@ const useNodesStore = defineStore('nodes', () => {
         return
 
       const status = statuses[uuid]
-      const index = nodes.value.findIndex(n => n.uuid === uuid)
+      const index = nodeIndexMap.get(uuid)
 
-      if (existingUuids.has(uuid) && index !== -1) {
+      if (index !== undefined) {
         // 更新现有节点
         const baseNode = createNodeFromClient(client)
         nodes.value[index] = status
@@ -292,9 +303,11 @@ const useNodesStore = defineStore('nodes', () => {
    * 更新节点状态（实时更新）
    */
   function updateNodeStatuses(statuses: Record<string, NodeStatus>): void {
+    const nodeIndexMap = createNodeIndexMap()
+
     Object.entries(statuses).forEach(([uuid, status]) => {
-      const index = nodes.value.findIndex(n => n.uuid === uuid)
-      if (index === -1)
+      const index = nodeIndexMap.get(uuid)
+      if (index === undefined)
         return
 
       const node = nodes.value[index]
@@ -310,12 +323,13 @@ const useNodesStore = defineStore('nodes', () => {
    */
   function updateNodeClients(clients: Record<string, Client>): void {
     const newUuids = new Set(Object.keys(clients))
+    const nodeIndexMap = createNodeIndexMap()
 
     // 更新现有节点信息或添加新节点
     Object.entries(clients).forEach(([uuid, client]) => {
-      const index = nodes.value.findIndex(n => n.uuid === uuid)
+      const index = nodeIndexMap.get(uuid)
 
-      if (index !== -1) {
+      if (index !== undefined) {
         // 更新现有节点，保留状态信息
         const currentNode = nodes.value[index]
         if (!currentNode)

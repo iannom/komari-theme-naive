@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import type { NodeData } from '@/stores/nodes'
 import { NButton, NCard, NEllipsis, NIcon, NModal, NProgress, NTag, NText, NTooltip, useThemeVars } from 'naive-ui'
-import { computed, ref } from 'vue'
-import PingChart from '@/components/PingChart.vue'
+import { computed, defineAsyncComponent, ref } from 'vue'
 import TrafficProgress from '@/components/TrafficProgress.vue'
 import { useAppStore } from '@/stores/app'
 import { formatBytesPerSecondWithConfig, formatBytesWithConfig, formatDateTime, formatUptimeWithFormat, getStatus } from '@/utils/helper'
@@ -19,6 +18,8 @@ const emit = defineEmits<{
 }>()
 
 const appStore = useAppStore()
+
+const PingChart = defineAsyncComponent(() => import('@/components/PingChart.vue'))
 
 // 获取 Naive UI 主题变量
 const themeVars = useThemeVars()
@@ -422,7 +423,7 @@ const cardBlurClass = computed(() => {
       :bordered="false"
       :segmented="{ content: true, footer: 'soft' }"
     >
-      <PingChart :uuid="props.node.uuid" />
+      <PingChart v-if="showPingChart" :uuid="props.node.uuid" />
     </NModal>
   </div>
 </template>

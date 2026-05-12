@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import type { NodeData } from '@/stores/nodes'
 import { NBadge, NButton, NIcon, NList, NListItem, NModal, NProgress, NTag, NText, NTooltip, useThemeVars } from 'naive-ui'
-import { computed, ref } from 'vue'
-import PingChart from '@/components/PingChart.vue'
+import { computed, defineAsyncComponent, ref } from 'vue'
 import TrafficProgress from '@/components/TrafficProgress.vue'
 import { useAppStore } from '@/stores/app'
 import { formatBytesPerSecondWithConfig, formatBytesWithConfig, formatDateTime, formatUptimeWithFormat, getStatus } from '@/utils/helper'
@@ -26,6 +25,8 @@ const isTouchDevice = computed(() => {
 })
 
 const appStore = useAppStore()
+
+const PingChart = defineAsyncComponent(() => import('@/components/PingChart.vue'))
 
 // 获取 Naive UI 主题变量
 const themeVars = useThemeVars()
@@ -584,7 +585,7 @@ const columnTitles: Record<string, string> = {
       :bordered="false"
       :segmented="{ content: true, footer: 'soft' }"
     >
-      <PingChart v-if="selectedNode" :uuid="selectedNode.uuid" />
+      <PingChart v-if="showPingChart && selectedNode" :uuid="selectedNode.uuid" />
     </NModal>
   </div>
 </template>
