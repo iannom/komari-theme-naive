@@ -3,6 +3,7 @@ import { NAvatar, NButton, NFlex, NH3, NPopover } from 'naive-ui'
 import { computed, h, inject, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app'
+import HeaderStats from './HeaderStats.vue'
 import LoginDialog from './LoginDialog.vue'
 
 const router = useRouter()
@@ -78,14 +79,15 @@ function handleButtonClick(action: string) {
 
 <template>
   <div class="transition-all duration-200 top-0 position-sticky z-10" :class="isScrolled ? 'bg-$n-color shadow-sm backdrop-blur-md' : 'bg-transparent'">
-    <div class="px-4 flex-between h-16" :style="containerStyle">
-      <NFlex class="flex-center cursor-pointer" @click="router.push('/')">
+    <div class="header-container px-4 h-16" :style="containerStyle">
+      <NFlex class="header-brand flex-center cursor-pointer" @click="router.push('/')">
         <NAvatar :src="siteFavicon" round />
-        <NH3 class="m-0">
+        <NH3 class="m-0 truncate">
           {{ appStore.publicSettings?.sitename || 'Komari Monitor' }}
         </NH3>
       </NFlex>
-      <NFlex class="flex gap-4">
+      <HeaderStats v-if="appStore.showHeaderStats" class="header-stats-panel" />
+      <NFlex class="header-actions flex gap-4">
         <NPopover v-for="button in actionButtons" :key="button.action" :disabled="button.disabled">
           <template #trigger>
             <NButton :disabled="button.disabled" class="p-2 h-8 w-8" text @click="handleButtonClick(button.action)">
@@ -100,3 +102,35 @@ function handleButtonClick(action: string) {
     </div>
   </div>
 </template>
+
+<style scoped lang="scss">
+.header-container {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) minmax(max-content, 1fr);
+  gap: 20px;
+  align-items: center;
+}
+
+.header-brand {
+  min-width: 0;
+  justify-self: start;
+}
+
+.header-actions {
+  justify-self: end;
+}
+
+.header-stats-panel {
+  min-width: 0;
+}
+
+@media (max-width: 960px) {
+  .header-container {
+    grid-template-columns: minmax(0, 1fr) max-content;
+  }
+
+  .header-stats-panel {
+    display: none;
+  }
+}
+</style>

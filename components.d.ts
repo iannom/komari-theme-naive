@@ -14,6 +14,7 @@ declare module 'vue' {
     Background: typeof import('./src/components/Background.vue')['default']
     Footer: typeof import('./src/components/Footer.vue')['default']
     Header: typeof import('./src/components/Header.vue')['default']
+    HeaderStats: typeof import('./src/components/HeaderStats.vue')['default']
     LoadChart: typeof import('./src/components/LoadChart.vue')['default']
     LoadingCover: typeof import('./src/components/LoadingCover.vue')['default']
     LoginDialog: typeof import('./src/components/LoginDialog.vue')['default']

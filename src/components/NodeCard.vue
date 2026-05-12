@@ -395,13 +395,13 @@ const cardBlurClass = computed(() => {
           </div>
 
           <!-- 标签单独一行显示（当 tagsInSeparateRow 为 true 时） -->
-          <div v-if="shouldShowTagsInSeparateRow" class="tags-separate-row flex-between">
+          <div v-if="appStore.tagsInSeparateRow" class="tags-separate-row flex-between">
             <NText :depth="3" class="text-[13px]">
               标签
             </NText>
-            <div class="flex flex-wrap gap-1 items-center justify-end">
+            <div class="tags-separate-row__items flex flex-wrap gap-1 items-center justify-end" :class="{ 'tags-separate-row__items--empty': mergedTags.length === 0 }">
               <NTag
-                v-for="(tag, index) in mergedTags"
+                v-for="(tag, index) in mergedTags.length > 0 ? mergedTags : [{ text: '占位', color: '#8D8D8D' }]"
                 :key="index"
                 size="small"
                 :color="{ color: `${tag.color}20`, textColor: tag.color, borderColor: `${tag.color}40` }"
@@ -432,6 +432,18 @@ const cardBlurClass = computed(() => {
 .node-card {
   position: relative;
   overflow: hidden;
+}
+
+.tags-separate-row {
+  min-height: 24px;
+}
+
+.tags-separate-row__items {
+  min-width: 0;
+}
+
+.tags-separate-row__items--empty {
+  visibility: hidden;
 }
 
 .node-offline-overlay {

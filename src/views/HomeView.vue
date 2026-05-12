@@ -175,8 +175,10 @@ const blurClass = computed(() => {
         <MarkdownRenderer :content="appStore.alertContent" />
       </NAlert>
     </div>
-    <NodeGeneralCards />
-    <NDivider class="my-0! px-4!" dashed />
+    <template v-if="!appStore.showHeaderStats">
+      <NodeGeneralCards />
+      <NDivider class="my-0! px-4!" dashed />
+    </template>
     <div class="node-info p-4 flex flex-col gap-4">
       <div class="search flex gap-2 items-center">
         <NInput

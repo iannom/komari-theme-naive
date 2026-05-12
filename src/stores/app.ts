@@ -326,6 +326,15 @@ const useAppStore = defineStore('app', () => {
     return true
   })
 
+  // 计算属性：是否在标题栏显示统计信息
+  const showHeaderStats = computed<boolean>(() => {
+    const settings = publicSettings.value?.theme_settings
+    if (settings && typeof settings.showHeaderStats === 'boolean') {
+      return settings.showHeaderStats
+    }
+    return false
+  })
+
   // 计算属性：是否将标签设置为单独一行显示
   const tagsInSeparateRow = computed<boolean>(() => {
     const settings = publicSettings.value?.theme_settings
@@ -632,6 +641,7 @@ const useAppStore = defineStore('app', () => {
     listStatusStyle,
     listTagsStyle,
     showPingChartButton,
+    showHeaderStats,
     tagsInSeparateRow,
     uptimeTagWrap,
     uptimeFormat,
